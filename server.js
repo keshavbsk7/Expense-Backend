@@ -10,7 +10,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://your-frontend.onrender.com"
+      "https://expense-frontend-xyz.onrender.com"
     ],
   })
 );
