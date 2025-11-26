@@ -83,7 +83,12 @@ function Login({ setIsLoggedIn })
       </form>
 
       <p style={{ marginTop: "20px" }}>
-        New user? <a href="/register">Create Account</a>
+        New user?  <span
+    onClick={() => navigate("/register")}
+    style={{ color: "#4a90e2", cursor: "pointer", fontWeight: "bold" }}
+  >
+    Create an account
+  </span>
       </p>
     </div>
   );

@@ -165,6 +165,7 @@ select:focus {
   justify-content: center;
   align-items: center;
   z-index: 999;
+  
 }
 
 /* Popup Box */
@@ -185,6 +186,9 @@ select:focus {
   margin-top: 15px;
   width: 120px;
   padding: 10px;
+}
+.popup-cancel{
+  margin-right: 10px;
 }
 /* Dropdown menu */
 /* Dropdown menu */
@@ -354,4 +358,217 @@ select:focus {
 .dropdown-item:hover {
   background-color: #e8f0ff !important;   /* Light blue highlight */
   border-radius: 4px;
+}
+/* NAVBAR FIXES */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;   /* 👈 Fixes logout alignment */
+  background: #4a90e2;
+  padding: 15px 30px;
+  color: white;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+  align-items: center;    /* 👈 Fixes alignment */
+  margin: 0;
+  padding: 0;
+}
+
+.nav-links li {
+  list-style: none;
+}
+
+/* Make menu items look like buttons */
+.nav-item-btn {
+  background: transparent;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: 0.3s ease;
+  font-size: 15px;
+  text-decoration: none !important;   /* 👈 NO underline ever */
+  color: white;
+  display: flex;
+  align-items: center;  /* alignment */
+}
+
+.nav-item-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Logout button - same alignment and height */
+.logout-btn {
+  background: #ff4d4d;
+  padding: 8px 14px;
+  border-radius: 6px;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  transition: 0.3s ease;
+  display: flex;
+  align-items: center;
+  margin-bottom: 9.5px; /* 👈 Align perfectly */
+}
+
+.logout-btn:hover {
+  background: #e60000;
+}
+/* Fade-in animation */
+.fade-in {
+  animation: fadeIn 0.8s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Card Style */
+.dashboard-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+}
+
+/* Dashboard title */
+.section-title {
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* Modern greeting card */
+.greeting-card {
+  background: linear-gradient(135deg, #4A90E2, #2C6EC9);
+  padding: 30px;
+  border-radius: 18px;
+  color: white;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  margin-bottom: 30px;
+}
+
+/* Grid layout row */
+.dashboard-row {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.dashboard-col {
+  flex: 1;
+  min-width: 360px;
+}
+/* SUMMARY CARDS GRID */
+.summary-row {
+  display: flex;
+  gap: 25px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.summary-card {
+  flex: 1;
+  min-width: 260px;
+  background: white;
+  padding: 22px;
+  border-radius: 14px;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.15);
+}
+
+.summary-icon {
+  font-size: 32px;
+}
+
+.summary-value {
+  font-size: 26px;
+  font-weight: bold;
+}
+
+/* DARK MODE */
+.dark-mode {
+  background: #1e1e1e;
+  color: white;
+}
+
+.dark-mode .summary-card {
+  background: #2b2b2b;
+  color: white;
+  box-shadow: none;
+}
+
+/* TOGGLE SWITCH */
+.toggle-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 15px;
+}
+
+.toggle-btn {
+  background: #4a90e2;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.toggle-btn:hover {
+  background: #3375c2;
+}
+
+/* Fade animation */
+.fade-in {
+  animation: fadeIn 0.8s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* FULL RESET FOR DELETE ICON BUTTON */
+.delete-icon-btn {
+  all: unset;            /* Removes ALL inherited button styling */
+  cursor: pointer;
+  font-size: 22px;
+  color: #c0392b;
+  position: absolute;
+  top: -35px;            /* Moves it above table */
+  left: 10px;            /* Aligns left */
+  z-index: 20;
+  padding: 5px;
+}
+
+.delete-icon-btn:hover {
+  transform: scale(1.2);
+  color: #e74c3c;
+}
+
+
+/* Make sure NO background bar appears */
+.table-wrapper {
+  position: relative;
+  background: transparent !important;
 }

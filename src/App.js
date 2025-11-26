@@ -9,12 +9,10 @@ import Register from "./components/Register";
 
 function App() {
 
-  // Track login changes
   const [isLoggedIn, setIsLoggedIn] = useState(
     localStorage.getItem("userId") !== null
   );
 
-  // Listen for login updates
   useEffect(() => {
     const handleStorageChange = () => {
       setIsLoggedIn(localStorage.getItem("userId") !== null);
@@ -30,11 +28,9 @@ function App() {
       {isLoggedIn && <Navbar />}
 
       <Routes>
-
-        <Route
-          path="/"
-          element={isLoggedIn ? <Navigate to="/home" /> : <Login setIsLoggedIn={setIsLoggedIn} />}
-        />
+        
+        {/* Always show Login on "/" */}
+        <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
 
         <Route path="/register" element={<Register />} />
 
