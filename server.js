@@ -75,6 +75,25 @@ app.delete("/expense/:id", async (req, res) => {
   }
 });
 
+// BULK DELETE
+app.post("/delete-multiple", async (req, res) => {
+  try {
+    const { ids } = req.body;  // array of _id values
+
+    if (!ids || ids.length === 0) {
+      return res.status(400).json({ message: "No IDs provided" });
+    }
+
+    await Expense.deleteMany({ _id: { $in: ids } });
+
+    res.json({ message: "Selected expenses deleted successfully" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Update Expense
 app.put("/expense/:id", async (req, res) => {
   try {
@@ -131,6 +150,136 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+const regression = require("regression");
+
+// CATEGORY BASED PREDICTION (Linear Regression)
+app.get("/category-prediction/:userId", async (req, res) => {
+  try {
+    const expenses = await Expense.find({ userId: req.params.userId });
+
+    if (expenses.length === 0) {
+      return res.json({ message: "No expense data found" });
+    }
+
+    // Group by category
+    const categoryMap = {};
+
+    expenses.forEach((exp) => {
+      const cat = exp.category;
+      if (!categoryMap[cat]) categoryMap[cat] = [];
+
+      categoryMap[cat].push([
+        new Date(exp.date).getTime(), // X → timestamp
+        exp.amount                     // Y → amount spent
+      ]);
+    });
+
+    const predictionResults = {};
+
+    // Perform regression for each category
+    for (const category in categoryMap) {
+      const dataPoints = categoryMap[category];
+
+      if (dataPoints.length < 2) {
+        predictionResults[category] = {
+          message: "Not enough data for regression",
+          predictedNext: 0,
+          slope: 0
+        };
+        continue;
+      }
+
+      const result = regression.linear(dataPoints);
+
+      const slope = result.equation[0];
+
+      // Predict next 30 days from now
+      const next30 = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      const predictedAmount = result.predict(next30)[1];
+
+      predictionResults[category] = {
+        slope,
+        predictedAmount,
+        dataPointsCount: dataPoints.length
+      };
+    }
+
+    // Find category with highest slope (fastest growing)
+    let topCategory = null;
+    let highestSlope = -Infinity;
+
+    for (const cat in predictionResults) {
+      if (predictionResults[cat].slope > highestSlope) {
+        highestSlope = predictionResults[cat].slope;
+        topCategory = cat;
+      }
+    }
+
+    res.json({
+      mostGrowingCategory: topCategory,
+      highestSlope,
+      predictionDetails: predictionResults
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+//const regression = require("regression");
+
+app.get("/category-analysis/:userId", async (req, res) => {
+  try {
+    const result = await Expense.aggregate([
+      { $match: { userId: req.params.userId } },
+
+      {
+        $group: {
+          _id: "$category",
+          totalSpent: { $sum: "$amount" }
+        }
+      },
+
+      { $sort: { totalSpent: -1 } }
+    ]);
+
+    res.json(result);  // MUST return an ARRAY
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// MONTHLY TREND (SUM OF ALL EXPENSES PER MONTH)
+app.get("/monthly-trend/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const result = await Expense.aggregate([
+      { $match: { userId } },
+
+      {
+        $group: {
+          _id: {
+            year: { $year: { $toDate: "$date" } },
+            month: { $month: { $toDate: "$date" } }
+          },
+          totalSpent: { $sum: "$amount" }
+        }
+      },
+
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    const formatted = result.map(r => ({
+      month: `${r._id.month}-${r._id.year}`,
+      totalSpent: r.totalSpent
+    }));
+
+    res.json(formatted);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ============================================
 
