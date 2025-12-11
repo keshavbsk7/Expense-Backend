@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import "../CSS/Register.css";
+import RegisterIllustration from "../Assets/register.svg";
+import SignupImage from "../Assets/signup.svg";
 function Register() {
   const [form, setForm] = useState({
     name: "",
@@ -102,7 +104,27 @@ const validateEmail = (email) => {
     errors.email!=="";
 
   return (
-    <div className="container login-box">
+  <div className="register-wrapper">
+
+    {/* FLOATING SHAPES */}
+    <div className="floating-shape shape1"></div>
+    <div className="floating-shape shape2"></div>
+    <div className="floating-shape shape3"></div>
+<div className="floating-shape shape4"></div>
+<div className="floating-shape shape5"></div>
+    {/* BACKGROUND ILLUSTRATION */}
+    <img
+      src={RegisterIllustration}
+      alt="illustration"
+      className="center-illustration"
+    />
+     <img
+      src={SignupImage}
+      alt="illustration"
+      className="right-illustration"
+    />
+
+    <div className="register-box">
       <h2>Create Account</h2>
 
       <form onSubmit={handleSubmit}>
@@ -123,33 +145,29 @@ const validateEmail = (email) => {
           onChange={handleChange}
         />
 
-      {/* EMAIL INPUT */}
-          <input
-            className="form-group"
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => {
-              handleChange(e);
+        {/* EMAIL */}
+        <input
+          className="form-group"
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={(e) => {
+            handleChange(e);
+            setErrors((prev) => ({ ...prev, email: "" }));
+          }}
+          onBlur={() => {
+            if (form.email.length > 0 && !validateEmail(form.email)) {
+              setErrors((prev) => ({ ...prev, email: "Enter a valid email address" }));
+            }
+          }}
+        />
 
-              // HIDE email error while typing
-              setErrors((prev) => ({ ...prev, email: "" }));
-            }}
-            onBlur={() => {
-              if (form.email.length > 0 && !validateEmail(form.email)) {
-                setErrors((prev) => ({ ...prev, email: "Enter a valid email address" }));
-              }
-            }}
-          />
+        {form.email.length > 0 && errors.email && (
+          <p className="error-text">{errors.email}</p>
+        )}
 
-          {/* Show EMAIL ERROR only when email has something & is invalid */}
-          {form.email.length > 0 && errors.email && (
-            <p style={{ color: "red", marginTop: "-10px" }}>{errors.email}</p>
-          )}
-
-
-        {/* PASSWORD INPUT */}
+        {/* PASSWORD */}
         <input
           className="form-group"
           type="password"
@@ -158,69 +176,50 @@ const validateEmail = (email) => {
           value={form.password}
           onChange={(e) => {
             handleChange(e);
-
-            // Hide error while typing
             setErrors((prev) => ({ ...prev, password: "" }));
           }}
           onBlur={handlePasswordBlur}
         />
 
-        {/* Show NOTE only when password is empty */}
         {form.password.length === 0 && (
-          <p
-            style={{
-              color: "#555",
-              fontSize: "13px",
-              marginTop: "5px",
-              marginBottom: "5px"
-            }}
-          >
-            Password must be at least <b>8 characters</b> and include:
-            <br />• 1 uppercase letter (A–Z)
-            <br />• 1 lowercase letter (a–z)
-            <br />• 1 number (0–9)
-            <br />• 1 special character (!@#$%)
+          <p className="note-text">
+            Password must include:
+            <br />• 8+ characters
+            <br />• Uppercase, lowercase
+            <br />• Number & special character
           </p>
         )}
 
-        {/* Show ERROR only if:  
-            - Password is not empty  
-            - Error exists  
-            - User is NOT typing (because we clear error while typing) */}
         {form.password.length > 0 && errors.password && (
-          <p style={{ color: "red", marginTop: "-10px" }}>{errors.password}</p>
+          <p className="error-text">{errors.password}</p>
         )}
-
-
 
         <input
           className="form-group"
           type="password"
           name="confirmPassword"
           placeholder="Confirm Password"
-          onChange={handleChange}   // LIVE validation here
+          onChange={handleChange}
         />
 
         {errors.confirm && (
-          <p style={{ color: "red", marginTop: "-10px" }}>{errors.confirm}</p>
+          <p className="error-text">{errors.confirm}</p>
         )}
 
-        <button type="submit" disabled={isDisabled} style={{ opacity: isDisabled ? 0.6 : 1 }}>
+        <button type="submit" disabled={isDisabled} className="register-btn">
           Create Account
         </button>
-        <p style={{ marginTop: "15px", textAlign: "center" }}>
-  Already have an account?{" "}
-  <span
-    onClick={() => navigate("/")}
-    style={{ color: "#4a90e2", cursor: "pointer", fontWeight: "bold" }}
-  >
-    Login here
-  </span>
-</p>
+
+        <p className="login-link">
+          Already have an account?{" "}
+          <span onClick={() => navigate("/")}>Login here</span>
+        </p>
 
       </form>
     </div>
-  );
+  </div>
+);
+
 }
 
 export default Register;

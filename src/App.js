@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 import AddExpense from "./components/AddExpense";
@@ -13,23 +14,24 @@ function App() {
     localStorage.getItem("userId") !== null
   );
 
+  const location = useLocation(); // NOW SAFE!
+
   useEffect(() => {
     const handleStorageChange = () => {
       setIsLoggedIn(localStorage.getItem("userId") !== null);
     };
-
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  return (
-    <Router>
+  const hideNavbarRoutes = ["/", "/register"];
+  const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
 
-      {isLoggedIn && <Navbar />}
+  return (
+    <>
+      {isLoggedIn && !shouldHideNavbar && <Navbar />}
 
       <Routes>
-        
-        {/* Always show Login on "/" */}
         <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
 
         <Route path="/register" element={<Register />} />
@@ -39,9 +41,8 @@ function App() {
         <Route path="/add-expense" element={isLoggedIn ? <AddExpense /> : <Navigate to="/" />} />
 
         <Route path="/view-expenses" element={isLoggedIn ? <ViewExpenses /> : <Navigate to="/" />} />
-
       </Routes>
-    </Router>
+    </>
   );
 }
 
