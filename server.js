@@ -1,6 +1,9 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
+const bcrypt = require("bcryptjs");
+
 require("dotenv").config();
 
 const app = express();
@@ -19,6 +22,13 @@ mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error(err));
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // your gmail
+    pass: process.env.EMAIL_PASS  // app password
+  }
+});
 
 // Expense Schema
 const expenseSchema = new mongoose.Schema({
@@ -43,6 +53,20 @@ const userSchema = new mongoose.Schema(
 
 const User = mongoose.model("User", userSchema);
 
+const passwordResetOtpSchema = new mongoose.Schema({
+  email: { type: String, required: true },
+  otpHash: { type: String, required: true },
+  expiresAt: { type: Date, required: true },
+  used: { type: Boolean, default: false },
+  attempts: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const PasswordResetOtp = mongoose.model(
+  "PasswordResetOtp",
+  passwordResetOtpSchema,
+  "password_reset_otps"
+);
 
 // Add Expense
 app.post("/add-expense", async (req, res) => {
@@ -280,6 +304,131 @@ app.get("/monthly-trend/:userId", async (req, res) => {
   }
 });
 
+app.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    // Always send same response (security)
+    if (!user) {
+      return res.json({ message: "If email exists, OTP has been sent" });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+
+    // Invalidate old OTPs
+    await PasswordResetOtp.updateMany(
+      { email, used: false },
+      { used: true }
+    );
+
+    // Save OTP
+    await PasswordResetOtp.create({
+      email,
+      otpHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 mins
+    });
+
+    // Send Email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Reset OTP",
+      text: `Your OTP is ${otp}. It is valid for 10 minutes.`
+    });
+
+    res.json({ message: "If email exists, OTP has been sent" });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to send OTP" });
+  }
+});
+app.post("/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    // const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const result = await User.findOneAndUpdate(
+      { email },
+      { password: newPassword }
+    );
+
+    if (!result) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Invalidate all OTPs
+    await PasswordResetOtp.updateMany(
+      { email },
+      { used: true }
+    );
+
+    res.json({ message: "Password reset successful" });
+
+  } catch (err) {
+    res.status(500).json({ error: "Password reset failed" });
+  }
+});
+app.post("/verify-reset-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    // Find latest unused OTP for this email
+    const otpRecord = await PasswordResetOtp.findOne({
+      email,
+      used: false
+    }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+  console.log("VERIFY OTP REQUEST");
+  console.log("EMAIL FROM UI:", email);
+  console.log("OTP FROM UI:", otp);
+console.log("OTP RECORD FROM DB:", otpRecord);
+
+    // Check expiry
+    if (otpRecord.expiresAt < new Date()) {
+      otpRecord.used = true;
+      await otpRecord.save();
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    // Limit attempts (optional but recommended)
+    if (otpRecord.attempts >= 5) {
+      otpRecord.used = true;
+      await otpRecord.save();
+      return res.status(400).json({ message: "Too many wrong attempts" });
+    }
+
+    // Compare OTP (bcrypt)
+    const isMatch = await bcrypt.compare(otp, otpRecord.otpHash);
+
+    if (!isMatch) {
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    // OTP is valid
+    otpRecord.used = true;
+    await otpRecord.save();
+
+    res.json({ message: "OTP verified successfully" });
+
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error while verifying OTP" });
+  }
+});
 
 // ============================================
 
