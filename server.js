@@ -28,9 +28,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  tls: {
-    rejectUnauthorized: false // ✅ required for your network
-  }
+  ...(process.env.NODE_ENV !== "production" && {
+    tls: { rejectUnauthorized: false }
+  })
 });
 transporter.verify((err) => {
   if (err) {
