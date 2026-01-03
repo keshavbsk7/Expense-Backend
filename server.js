@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
-
+const sgMail = require("@sendgrid/mail");
 require("dotenv").config();
 
 const app = express();
@@ -22,23 +22,10 @@ mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error(err));
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  ...(process.env.NODE_ENV !== "production" && {
-    tls: { rejectUnauthorized: false }
-  })
-});
-transporter.verify((err) => {
-  if (err) {
-    console.error("❌ Mail server config error:", err);
-  } else {
-    console.log("✅ Mail server ready");
-  }
-});
+if (!process.env.SENDGRID_API_KEY) {
+  console.error("❌ SENDGRID_API_KEY missing");
+}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 
 // Expense Schema
@@ -344,13 +331,12 @@ app.post("/forgot-password", async (req, res) => {
     });
 
     // Send Email
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+  await sgMail.send({
       to: email,
+      from: process.env.EMAIL_FROM,
       subject: "Password Reset OTP",
-      text: `Your OTP is ${otp}. It is valid for 10 minutes.`
+      text: `Your OTP is ${otp}. It is valid for 10 minutes.`,
     });
-   
 
 
     res.json({ message: "If email exists, OTP has been sent" });
