@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Ping Render Server
         run: |
-          curl -I https://expense-backend-rxqo.onrender.com
+          curl -I https://expense-backend-rxqo.onrender.com/health
