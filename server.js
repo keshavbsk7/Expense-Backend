@@ -430,7 +430,9 @@ console.log("OTP RECORD FROM DB:", otpRecord);
     res.status(500).json({ message: "Server error while verifying OTP" });
   }
 });
-
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 // ============================================
 
 const PORT = process.env.PORT || 5000;
