@@ -4,8 +4,10 @@ const cors = require("cors");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
 const sgMail = require("@sendgrid/mail");
-require("dotenv").config();
 
+
+require("dotenv").config();
+const upload = require("./upload");
 const app = express();
 
 app.use(express.json());
@@ -51,7 +53,8 @@ const userSchema = new mongoose.Schema(
     name: String,
     username: String,
     email: String,
-    password: String
+    password: String,
+    profileImage: String
   },
   { collection: "user_details" } // 👈 VERY IMPORTANT
 );
@@ -467,6 +470,68 @@ console.log("OTP RECORD FROM DB:", otpRecord);
     res.status(500).json({ message: "Server error while verifying OTP" });
   }
 });
+
+// ===============================
+// UPLOAD PROFILE IMAGE (CLOUDINARY)
+// ===============================
+app.post(
+  "/upload-profile-image/:userId",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image uploaded" });
+      }
+
+      const imageUrl = req.file.path; // Cloudinary secure URL
+
+      const user = await User.findByIdAndUpdate(
+        req.params.userId,
+        { profileImage: imageUrl },
+        { new: true }
+      ).select("-password");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        message: "Profile image uploaded successfully",
+        imageUrl: user.profileImage
+      });
+
+    } catch (err) {
+      console.error("Profile image upload error:", err);
+      res.status(500).json({ message: "Image upload failed" });
+    }
+  }
+);
+
+app.get("/user/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+app.put("/user/:id", async (req, res) => {
+  try {
+    const { name, username, email, profileImage } = req.body;
+
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, username, email, profileImage },
+      { new: true }
+    ).select("-password");
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Profile update failed" });
+  }
+});
+
+
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
