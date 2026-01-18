@@ -214,7 +214,7 @@ const regression = require("regression");
 // CATEGORY BASED PREDICTION (Linear Regression)
 app.get("/category-prediction/:userId", async (req, res) => {
   try {
-    const expenses = await Expense.find({ userId: req.params.userId });
+    const expenses = await Expense.find({ userId: req.params.userId,transactionType: "debit"  });
 
     if (expenses.length === 0) {
       return res.json({ message: "No expense data found" });
@@ -289,7 +289,7 @@ app.get("/category-prediction/:userId", async (req, res) => {
 app.get("/category-analysis/:userId", async (req, res) => {
   try {
     const result = await Expense.aggregate([
-      { $match: { userId: req.params.userId } },
+      { $match: { userId: req.params.userId,transactionType: "debit"  } },
 
       {
         $group: {
