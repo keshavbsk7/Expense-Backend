@@ -312,7 +312,7 @@ app.get("/monthly-trend/:userId", async (req, res) => {
     const userId = req.params.userId;
 
     const result = await Expense.aggregate([
-      { $match: { userId } },
+      { $match: { userId,transactionType: "debit" } },
 
       {
         $group: {
