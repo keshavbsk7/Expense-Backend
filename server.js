@@ -30,11 +30,18 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Expense Schema
 const expenseSchema = new mongoose.Schema({
-  amount: Number,
-  date: String,
-  category: String,
+  amount: { type: Number, required: true },
+  date: { type: String, required: true },
+  category: { type: String, required: true },
   description: String,
-  userId: String
+  userId: { type: String, required: true },
+
+  // NEW
+  transactionType: {
+    type: String,
+    enum: ["credit", "debit"],
+    required: true
+  }
 });
 
 const Expense = mongoose.model("Expense", expenseSchema);
@@ -72,6 +79,36 @@ app.post("/add-expense", async (req, res) => {
     const expense = new Expense(req.body); // includes userId
     await expense.save();
     res.json({ message: "Expense added successfully!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/available-balance/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const result = await Expense.aggregate([
+      { $match: { userId } },
+      {
+        $group: {
+          _id: "$transactionType",
+          total: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    let credit = 0;
+    let debit = 0;
+
+    result.forEach(r => {
+      if (r._id === "credit") credit = r.total;
+      if (r._id === "debit") debit = r.total;
+    });
+
+    res.json({
+      availableBalance: credit - debit
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
