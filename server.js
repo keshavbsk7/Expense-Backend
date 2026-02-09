@@ -367,7 +367,7 @@ app.post("/forgot-password", async (req, res) => {
     await PasswordResetOtp.create({
       email,
       otpHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 mins
+      expiresAt: new Date(Date.now() + 01 * 60 * 1000) // 1 mins
     });
 
     // Send Email
