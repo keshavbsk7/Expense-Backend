@@ -3,9 +3,13 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
+const sgMail = require("@sendgrid/mail");
+const jwt = require("jsonwebtoken");
+const { createClient } = require("redis");
+
 
 require("dotenv").config();
-
+const upload = require("./upload");
 const app = express();
 
 app.use(express.json());
@@ -22,21 +26,35 @@ mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error(err));
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER, // your gmail
-    pass: process.env.EMAIL_PASS  // app password
-  }
+if (!process.env.SENDGRID_API_KEY) {
+  console.error("❌ SENDGRID_API_KEY missing");
+}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// ===== REDIS CONNECTION =====
+const redis = createClient({
+  url: process.env.REDIS_URL,
+  socket: { tls: true }
 });
+
+redis.connect()
+  .then(() => console.log("✅ Redis connected"))
+  .catch(err => console.error("Redis error:", err));
 
 // Expense Schema
 const expenseSchema = new mongoose.Schema({
-  amount: Number,
-  date: String,
-  category: String,
+  amount: { type: Number, required: true },
+  date: { type: String, required: true },
+  category: { type: String, required: true },
   description: String,
-  userId: String
+  userId: { type: String, required: true },
+
+  // NEW
+  transactionType: {
+    type: String,
+    enum: ["credit", "debit"],
+    required: true
+  }
 });
 
 const Expense = mongoose.model("Expense", expenseSchema);
@@ -46,7 +64,8 @@ const userSchema = new mongoose.Schema(
     name: String,
     username: String,
     email: String,
-    password: String
+    password: String,
+    profileImage: String
   },
   { collection: "user_details" } // 👈 VERY IMPORTANT
 );
@@ -67,13 +86,64 @@ const PasswordResetOtp = mongoose.model(
   passwordResetOtpSchema,
   "password_reset_otps"
 );
+const authMiddleware = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) return res.status(401).json({ message: "No token" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const version = await redis.get(`auth:session_version:${decoded.userId}`);
+
+    if (parseInt(version) !== decoded.sessionVersion) {
+      return res.status(401).json({ message: "Session expired" });
+    }
+
+    req.user = decoded;
+    next();
+
+  } catch {
+    res.status(401).json({ message: "Invalid token" });
+  }
+};
 
 // Add Expense
-app.post("/add-expense", async (req, res) => {
+app.post("/add-expense",authMiddleware, async (req, res) => {
   try {
     const expense = new Expense(req.body); // includes userId
     await expense.save();
     res.json({ message: "Expense added successfully!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/available-balance/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const result = await Expense.aggregate([
+      { $match: { userId } },
+      {
+        $group: {
+          _id: "$transactionType",
+          total: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    let credit = 0;
+    let debit = 0;
+
+    result.forEach(r => {
+      if (r._id === "credit") credit = r.total;
+      if (r._id === "debit") debit = r.total;
+    });
+
+    res.json({
+      availableBalance: credit - debit
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -147,9 +217,19 @@ app.post("/register", async (req, res) => {
     }
 
     const user = new User({ name, username, email, password });
+   
     await user.save();
 
-    res.json({ message: "User registered successfully!" });
+    const usercheck = await User.findOne({ email });
+
+      if (usercheck) {
+        const key = `auth:session_version:${usercheck._id}`;
+        const current = await redis.get(key) || 1;
+        await redis.set(key, parseInt(current) + 1);
+      }
+
+      res.json({ message: "Password reset successful" });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -164,11 +244,28 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid username or password" });
     }
 
-    res.json({
-      message: "Login successful",
-      userId: user._id,
-      name: user.name
-    });
+    const key = `auth:session_version:${user._id}`;
+
+      let version = await redis.get(key);
+
+      if (!version) {
+        version = 1;
+        await redis.set(key, version);
+      }
+
+      const token = jwt.sign(
+        { userId: user._id, sessionVersion: parseInt(version) },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      res.json({
+        message: "Login successful",
+        userId: user._id,
+        name: user.name,
+        token
+      });
+
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -179,7 +276,7 @@ const regression = require("regression");
 // CATEGORY BASED PREDICTION (Linear Regression)
 app.get("/category-prediction/:userId", async (req, res) => {
   try {
-    const expenses = await Expense.find({ userId: req.params.userId });
+    const expenses = await Expense.find({ userId: req.params.userId,transactionType: "debit"  });
 
     if (expenses.length === 0) {
       return res.json({ message: "No expense data found" });
@@ -254,7 +351,7 @@ app.get("/category-prediction/:userId", async (req, res) => {
 app.get("/category-analysis/:userId", async (req, res) => {
   try {
     const result = await Expense.aggregate([
-      { $match: { userId: req.params.userId } },
+      { $match: { userId: req.params.userId,transactionType: "debit"  } },
 
       {
         $group: {
@@ -277,7 +374,7 @@ app.get("/monthly-trend/:userId", async (req, res) => {
     const userId = req.params.userId;
 
     const result = await Expense.aggregate([
-      { $match: { userId } },
+      { $match: { userId,transactionType: "debit" } },
 
       {
         $group: {
@@ -329,21 +426,24 @@ app.post("/forgot-password", async (req, res) => {
     await PasswordResetOtp.create({
       email,
       otpHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 mins
+      expiresAt: new Date(Date.now() + 01 * 60 * 1000) // 1 mins
     });
 
     // Send Email
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+  await sgMail.send({
       to: email,
+      from: process.env.EMAIL_FROM,
       subject: "Password Reset OTP",
-      text: `Your OTP is ${otp}. It is valid for 10 minutes.`
+      text: `Your OTP is ${otp}. It is valid for 10 minutes.`,
     });
+
 
     res.json({ message: "If email exists, OTP has been sent" });
 
   } catch (err) {
-    res.status(500).json({ error: "Failed to send OTP" });
+    
+     console.error("Forgot password error:", err);
+  res.status(500).json({ error: "Failed to send OTP" });
   }
 });
 app.post("/reset-password", async (req, res) => {
@@ -430,6 +530,70 @@ console.log("OTP RECORD FROM DB:", otpRecord);
   }
 });
 
+// ===============================
+// UPLOAD PROFILE IMAGE (CLOUDINARY)
+// ===============================
+app.post(
+  "/upload-profile-image/:userId",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image uploaded" });
+      }
+
+      const imageUrl = req.file.path; // Cloudinary secure URL
+
+      const user = await User.findByIdAndUpdate(
+        req.params.userId,
+        { profileImage: imageUrl },
+        { new: true }
+      ).select("-password");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        message: "Profile image uploaded successfully",
+        imageUrl: user.profileImage
+      });
+
+    } catch (err) {
+      console.error("Profile image upload error:", err);
+      res.status(500).json({ message: "Image upload failed" });
+    }
+  }
+);
+
+app.get("/user/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+app.put("/user/:id", async (req, res) => {
+  try {
+    const { name, username, email, profileImage } = req.body;
+
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, username, email, profileImage },
+      { new: true }
+    ).select("-password");
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Profile update failed" });
+  }
+});
+
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 // ============================================
 
 const PORT = process.env.PORT || 5000;
